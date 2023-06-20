@@ -1,7 +1,7 @@
 <div align="center" markdown>
 <img src="!PLACEHOLDER!"/>
 
-# Update repos as a ninja
+# Edit repos as a ninja
 
 <p align="center">
   <a href="#Overview">Overview</a> •
@@ -19,7 +19,7 @@
 
 ## Overview
 
-This app allows you to easily run scripts from the Ninja repository provided in the JSON file list of repositories.
+This app allows you to edit settings in the Ninja repository.
 
 ## Preparation
 
@@ -30,6 +30,8 @@ This app allows you to easily run scripts from the Ninja repository provided in 
 ## How To Run
 
 1. Launch the app from the context menu of your ssh key file (`id_rsa`) in the TeamFiles folder.
-2. Select repositories to update in the Transfer widget in Step 2️⃣.
-3. Config forces in Step 3️⃣ (optional).
-4. Press the `Start` button.
+2. Enter the repo URL in Step 2️⃣.
+3. Use widgets to select all required fields in Step 3️⃣.
+4. Click `Apply` button to write the `settings.py` file.
+5. Optional: use the Editor widget to manually edit the code.
+6. Press the `Push` button to commit and push the changes to the repo.

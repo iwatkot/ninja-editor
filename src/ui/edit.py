@@ -15,7 +15,6 @@ from supervisely.app.widgets import (
     Editor,
 )
 
-from git import Repo
 
 from dataset_tools.templates import License, Industry, CVTask, AnnotationType
 
@@ -289,9 +288,12 @@ def push():
         sly.logger.info("No files was added to index in repo. Nothing to commit.")
         status_text.text = "No files was added to index in repo. Nothing to commit."
         status_text.status = "info"
+        status_text.show()
+        push_button.text = "Push"
+        apply_button.enable()
         return
 
-    repo.index.commit("Automatic commit by repo-updater.")
+    repo.index.commit("Automatic commit by repo-editor.")
     sly.logger.info("Created commit. Pushing...")
 
     remote = repo.remote("origin")

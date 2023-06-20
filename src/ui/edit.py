@@ -1,3 +1,6 @@
+import os
+import supervisely as sly
+
 from supervisely.app.widgets import (
     Select,
     Field,
@@ -7,8 +10,26 @@ from supervisely.app.widgets import (
     Button,
     Input,
     InputNumber,
+    Text,
+    Flexbox,
+    Editor,
 )
 from dataset_tools.templates import License, Industry, CVTask, AnnotationType
+
+import src.globals as g
+
+bad_settings_text = Text("Incorrect settings were entered.", "error")
+bad_settings_text.hide()
+
+status_text = Text()
+status_text.hide()
+
+project_name_input = Input(placeholder="Input project name")
+project_name_field = Field(
+    title="* Project name",
+    description="Enter project name which will be used on Ninja website.",
+    content=project_name_input,
+)
 
 licensies = [
     subclass for subclass in License.__dict__.values() if isinstance(subclass, type)
@@ -93,8 +114,6 @@ preview_image_id_field = Field(
     content=preview_image_id_input,
 )
 
-# TODO: READ GITHUB FROM APPSTATE!
-
 download_original_url_input = Input(placeholder="Enter download original URL")
 download_original_url_field = Field(
     title="Download original URL",
@@ -104,6 +123,8 @@ download_original_url_field = Field(
 
 settings_container = Container(
     widgets=[
+        bad_settings_text,
+        project_name_field,
         license_field,
         industry_field,
         cvtask_field,
@@ -115,20 +136,186 @@ settings_container = Container(
 )
 options_container = Container(widgets=[])
 
+settings_preview = Editor(height_lines=80, language_mode="python")
+
+settings_tabs = RadioTabs(
+    titles=["Edit", "Preview"],
+    contents=[settings_container, settings_preview],
+)
+
 edit_tabs = RadioTabs(
     titles=["Settings", "Options"],
-    contents=[settings_container, options_container],
+    contents=[settings_tabs, options_container],
 )
 
 apply_button = Button("Apply", icon="zmdi zmdi-check")
+apply_button.disable()
+
+push_button = Button("Push", icon="zmdi zmdi-github-alt", button_type="success")
+push_button.disable()
+
+buttons_flexbox = Flexbox([apply_button, push_button])
+
 
 card = Card(
     title="3️⃣ Edit repository",
     description="Prepare settings for the dataset.",
-    content=edit_tabs,
+    content=Container([status_text, edit_tabs]),
     collapsable=True,
     lock_message="Select and clone repository on step 2️⃣.",
-    content_top_right=apply_button,
+    content_top_right=buttons_flexbox,
 )
-# card.lock()
-# card.collapse()
+card.lock()
+card.collapse()
+
+
+@apply_button.click
+def apply():
+    bad_settings_text.hide()
+    status_text.hide()
+
+    try:
+        new_settings = {
+            "PROJECT_NAME": f'"{project_name_input.get_value()}"',
+            "LICENSE": f"License.{license_select.get_value()}()",
+            "INDUSTRIES": str(
+                [f"Industry.{industry}()" for industry in industry_select.get_value()]
+            ).replace("'", ""),
+            "CV_TASKS": str(
+                [f"CVTask.{cvtask}()" for cvtask in cvtask_select.get_value()]
+            ).replace("'", ""),
+            "ANNOTATION_TYPES": str(
+                [
+                    f"AnnotationType.{annotation_type}()"
+                    for annotation_type in annotation_types_select.get_value()
+                ]
+            ).replace("'", ""),
+            "RELEASE_YEAR": release_year_input.get_value(),
+            "HOMEPAGE_URL": f'"{homepage_url_input.get_value()}"',
+            "PREVIEW_IMAGE_ID": preview_image_id_input.get_value(),
+            "GITHUB_URL": f'"{g.AppState.repo_url}"',
+        }
+    except Exception as e:
+        sly.logger.error(f"Error while reading new settings: {e}")
+        bad_settings_text.show()
+        return
+
+    if any([value is None for value in new_settings.values()]):
+        sly.logger.error("Some settings are empty, stopping")
+        bad_settings_text.show()
+        return
+
+    sly.logger.debug(f"New settings: {new_settings}")
+
+    settings_py_path = os.path.join(g.AppState.local_repo_path, "src", "settings.py")
+
+    sly.logger.info(f"Updating settings.py: {settings_py_path}")
+
+    with open(settings_py_path, "r") as file:
+        lines = file.readlines()
+        for key, value in new_settings.items():
+            for i, line in enumerate(lines):
+                if line.startswith(key):
+                    sly.logger.info(
+                        f"Found needed line: {line} with key: {key} for editing"
+                    )
+
+                    line_beginning = f"{line.rsplit('=', 1)[0].strip()} = "
+                    line_ending = str(value)
+                    new_line = line_beginning + line_ending + "\n"
+
+                    sly.logger.info(f"Will replace the line with new line: {new_line}")
+
+                    lines[i] = new_line
+
+    sly.logger.info(
+        f"Finish updating settings.py: {settings_py_path}, will write to file"
+    )
+
+    with open(settings_py_path, "w") as file:
+        file.writelines(lines)
+
+    sly.logger.info(f"Finish writing to settings.py: {settings_py_path}")
+
+    settings_tabs.loading = True
+    settings_preview.loading = True
+
+    settings_preview.set_text("".join(lines))
+    push_button.enable()
+
+    settings_tabs.loading = False
+    settings_preview.loading = False
+
+    settings_tabs.set_active_tab("Preview")
+
+
+@push_button.click
+def push():
+    status_text.hide()
+    push_button.text = "Pushing..."
+    apply_button.disable()
+    settings_file_string = settings_preview.get_text()
+    settings_py_path = os.path.join(g.AppState.local_repo_path, "src", "settings.py")
+
+    with open(settings_py_path, "w") as file:
+        file.write(settings_file_string)
+
+    sly.logger.info(
+        f"Readed contents from the widget and saved it into settings.py: {settings_py_path}"
+    )
+
+    repo = g.AppState.repo
+
+    index = repo.index
+    index.add([settings_py_path])
+
+    sly.logger.info(f"Added settings.py to index: {settings_py_path}")
+
+    if not index.diff("HEAD"):
+        sly.logger.info("No files was added to index in repo. Nothing to commit.")
+        status_text.text = "No files was added to index in repo. Nothing to commit."
+        status_text.status = "info"
+        return
+
+    repo.index.commit("Automatic commit by repo-updater.")
+    sly.logger.info("Created commit. Pushing...")
+
+    remote = repo.remote("origin")
+    remote.push()
+
+    sly.logger.info("Pushed commit to remote.")
+
+    push_button.text = "Push"
+    apply_button.enable()
+
+    status_text.text = "Pushed commit to remote."
+    status_text.status = "success"
+    status_text.show()
+
+
+def check_inputs(value):
+    push_button.disable()
+
+    widgets_to_check = [
+        project_name_input,
+        license_select,
+        industry_select,
+        cvtask_select,
+        annotation_types_select,
+        release_year_input,
+        homepage_url_input,
+    ]
+
+    if any([not widget.get_value() for widget in widgets_to_check]):
+        apply_button.disable()
+    else:
+        apply_button.enable()
+
+
+project_name_input.value_changed(check_inputs)
+license_select.value_changed(check_inputs)
+industry_select.value_changed(check_inputs)
+cvtask_select.value_changed(check_inputs)
+annotation_types_select.value_changed(check_inputs)
+release_year_input.value_changed(check_inputs)
+homepage_url_input.value_changed(check_inputs)

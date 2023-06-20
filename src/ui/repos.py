@@ -1,9 +1,11 @@
 import os
+import fileinput
 
 from supervisely.app.widgets import Text, Card, Container, Button, Input, Field
 import supervisely as sly
 
 import src.globals as g
+import src.ui.edit as edit
 
 from git import Repo
 
@@ -29,6 +31,7 @@ card = Card(
     content=Container(widgets=[repo_url_field, bad_input_text, lock_button]),
     content_top_right=unlock_button,
     collapsable=True,
+    lock_message="The repository is selected and locked.",
 )
 
 
@@ -36,6 +39,7 @@ card = Card(
 def lock():
     bad_input_text.hide()
     repo_url = repo_url_input.get_value()
+    lock_button.text = "Cloning..."
 
     try:
         repo_name = repo_url.split("/")[-1].split(".")[0]
@@ -62,15 +66,15 @@ def lock():
         bad_input_text.show()
         return
 
-    repo_main_py = os.path.join(local_repo_path, "src", "main.py")
-    if not os.path.exists(repo_main_py):
+    repo_settings_py = os.path.join(local_repo_path, "src", "settings.py")
+    if not os.path.exists(repo_settings_py):
         sly.logger.error(
-            "Failed to find main.py in the src dir o the repository. Please, ensure that you have correct repository structure."
+            "Failed to find settings.py in the src dir o the repository. Please, ensure that you have correct repository structure."
         )
         sly.app.show_dialog(
-            title="The repo doesn't contains src/main.py",
+            title="The repo doesn't contains src/settings.py",
             description=(
-                "Failed to find main.py in the src dir of the repository. Please, ensure that you have correct repository structure."
+                "Failed to find settings.py in the src dir of the repository. Please, ensure that you have correct repository structure."
             ),
             status="error",
         )
@@ -79,6 +83,7 @@ def lock():
 
     unlock_button.show()
     lock_button.hide()
+    lock_button.text = "Lock"
 
     g.AppState.repo_url = repo_url
     g.AppState.repo_name = repo_name
@@ -87,8 +92,25 @@ def lock():
     g.AppState.local_repo_path = local_repo_path
     g.AppState.repo = repo
 
-    update.card.unlock()
-    update.card.uncollapse()
+    read_settings()
+
+    card.lock()
+
+    edit.card.unlock()
+    edit.card.uncollapse()
+
+
+def read_settings():
+    settings = {}
+    settings_py_path = os.path.join(g.AppState.local_repo_path, "src", "settings.py")
+
+    with fileinput.FileInput(settings_py_path) as file:
+        for line in file:
+            for field in g.AppState.required_fields:
+                if line.startswith(field):
+                    settings[field] = line.split("=")[1].strip().strip('"')
+
+    g.AppState.settings = settings
 
 
 @unlock_button.click
@@ -99,5 +121,5 @@ def unlock():
 
     g.AppState.clear()
 
-    update.card.lock()
-    update.card.collapse()
+    edit.card.lock()
+    edit.card.collapse()

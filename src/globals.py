@@ -35,6 +35,18 @@ class State:
         self.ssh_url = None
         self.local_repo_path = None
         self.repo = None
+        self.required_fields = [
+            "PROJECT_NAME",
+            "LICENSE",
+            "INDUSTRIES",
+            "CV_TASKS",
+            "ANNOTATION_TYPES",
+            "RELEASE_YEAR",
+            "HOMEPAGE_URL",
+            "PREVIEW_IMAGE_ID",
+            "GITHUB_URL",
+        ]
+        self.settings = {}
 
     def clear(self):
         self.repo_url = None

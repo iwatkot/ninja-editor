@@ -14,6 +14,9 @@ from supervisely.app.widgets import (
     Flexbox,
     Editor,
 )
+
+from git import Repo
+
 from dataset_tools.templates import License, Industry, CVTask, AnnotationType
 
 import src.globals as g
@@ -278,7 +281,8 @@ def push():
         f"Readed contents from the widget and saved it into settings.py: {settings_py_path}"
     )
 
-    repo = g.AppState.repo
+    local_repo_path = g.AppState.local_repo_path
+    repo = Repo(local_repo_path)
 
     index = repo.index
     index.add([settings_py_path])

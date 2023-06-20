@@ -31,6 +31,13 @@ project_name_field = Field(
     content=project_name_input,
 )
 
+project_name_full_input = Input(placeholder="Input project name")
+project_name_full_field = Field(
+    title="Project name (full)",
+    description="Enter the full project name which will be used on Ninja website.",
+    content=project_name_full_input,
+)
+
 licensies = [
     subclass for subclass in License.__dict__.values() if isinstance(subclass, type)
 ]
@@ -41,6 +48,7 @@ license_items = [
     Select.Item(value, label) for value, label in zip(license_values, license_labels)
 ]
 license_select = Select(license_items, filterable=True, placeholder="Select license")
+license_select.set_value(None)
 license_field = Field(
     title="* License",
     description="Select license to apply to the dataset.",
@@ -93,7 +101,7 @@ annotation_types_field = Field(
     content=annotation_types_select,
 )
 
-release_year_input = InputNumber(value=2020, min=1900)
+release_year_input = InputNumber()
 release_year_field = Field(
     title="* Release year",
     description="Enter release year of the dataset.",
@@ -125,6 +133,7 @@ settings_container = Container(
     widgets=[
         bad_settings_text,
         project_name_field,
+        project_name_full_field,
         license_field,
         industry_field,
         cvtask_field,
@@ -149,7 +158,6 @@ edit_tabs = RadioTabs(
 )
 
 apply_button = Button("Apply", icon="zmdi zmdi-check")
-apply_button.disable()
 
 push_button = Button("Push", icon="zmdi zmdi-github-alt", button_type="success")
 push_button.disable()
@@ -205,6 +213,12 @@ def apply():
         bad_settings_text.show()
         return
 
+    optional_settings = {
+        "PROJECT_NAME_FULL": f'"{project_name_full_input.get_value()}"',
+    }
+
+    new_settings.update(optional_settings)
+
     sly.logger.debug(f"New settings: {new_settings}")
 
     settings_py_path = os.path.join(g.AppState.local_repo_path, "src", "settings.py")
@@ -215,7 +229,7 @@ def apply():
         lines = file.readlines()
         for key, value in new_settings.items():
             for i, line in enumerate(lines):
-                if line.startswith(key):
+                if line.startswith(f"{key}:"):
                     sly.logger.info(
                         f"Found needed line: {line} with key: {key} for editing"
                     )
@@ -293,7 +307,59 @@ def push():
     status_text.show()
 
 
-def check_inputs(value):
+def load_settings():
+    settings = g.AppState.settings
+
+    for key, value in settings.items():
+        if value == "None":
+            settings[key] = None
+
+    sly.logger.info("Trying to load settings from file to widgets...")
+
+    if settings.get("PROJECT_NAME"):
+        project_name_input.set_value(settings["PROJECT_NAME"].strip('"'))
+
+    if settings.get("PROJECT_NAME_FULL"):
+        project_name_full_input.set_value(settings["PROJECT_NAME_FULL"].strip('"'))
+
+    if settings.get("LICENSE"):
+        license_select.set_value(settings["LICENSE"].split(".")[-1].strip("()"))
+
+    if settings.get("INDUSTRIES"):
+        industries = settings["INDUSTRIES"].replace("[", "").replace("]", "").split(",")
+        industry_select.set_value(
+            [industry.split(".")[-1].strip("()") for industry in industries]
+        )
+
+    if settings.get("CV_TASKS"):
+        cvtasks = settings["CV_TASKS"].replace("[", "").replace("]", "").split(",")
+        cvtask_select.set_value(
+            [cvtask.split(".")[-1].strip("()") for cvtask in cvtasks]
+        )
+
+    if settings.get("ANNOTATION_TYPES"):
+        annotation_types = (
+            settings["ANNOTATION_TYPES"].replace("[", "").replace("]", "").split(",")
+        )
+        annotation_types_select.set_value(
+            [
+                annotation_type.split(".")[-1].strip("()")
+                for annotation_type in annotation_types
+            ]
+        )
+
+    if settings.get("RELEASE_YEAR"):
+        release_year_input.value = int(settings["RELEASE_YEAR"].strip('"'))
+
+    if settings.get("HOMEPAGE_URL"):
+        homepage_url_input.set_value(settings["HOMEPAGE_URL"].strip('"'))
+
+    if settings.get("PREVIEW_IMAGE_ID"):
+        preview_image_id_input.value = int(settings["PREVIEW_IMAGE_ID"].strip('"'))
+
+
+"""
+def check_inputs(value=None):
     push_button.disable()
 
     widgets_to_check = [
@@ -305,6 +371,9 @@ def check_inputs(value):
         release_year_input,
         homepage_url_input,
     ]
+
+    values = [widget.get_value() for widget in widgets_to_check]
+    print(values)
 
     if any([not widget.get_value() for widget in widgets_to_check]):
         apply_button.disable()
@@ -319,3 +388,4 @@ cvtask_select.value_changed(check_inputs)
 annotation_types_select.value_changed(check_inputs)
 release_year_input.value_changed(check_inputs)
 homepage_url_input.value_changed(check_inputs)
+"""

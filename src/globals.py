@@ -46,6 +46,10 @@ class State:
             "PREVIEW_IMAGE_ID",
             "GITHUB_URL",
         ]
+
+        self.optional_fields = [
+            "PROJECT_NAME_FULL",
+        ]
         self.settings = {}
 
     def clear(self):

@@ -1,5 +1,4 @@
 import os
-import fileinput
 
 from supervisely.app.widgets import Text, Card, Container, Button, Input, Field
 import supervisely as sly
@@ -93,6 +92,7 @@ def lock():
     g.AppState.repo = repo
 
     read_settings()
+    edit.load_settings()
 
     card.lock()
 
@@ -104,11 +104,17 @@ def read_settings():
     settings = {}
     settings_py_path = os.path.join(g.AppState.local_repo_path, "src", "settings.py")
 
-    with fileinput.FileInput(settings_py_path) as file:
+    with open(settings_py_path, "r") as file:
         for line in file:
             for field in g.AppState.required_fields:
+                if line.startswith(f"{field}:"):
+                    settings[field] = line.split("=")[1].strip().strip('"')
+
+            for field in g.AppState.optional_fields:
                 if line.startswith(field):
                     settings[field] = line.split("=")[1].strip().strip('"')
+
+    sly.logger.info(f"Read current settings: {settings}.")
 
     g.AppState.settings = settings
 
@@ -123,3 +129,6 @@ def unlock():
 
     edit.card.lock()
     edit.card.collapse()
+
+    card.unlock()
+    card.uncollapse()

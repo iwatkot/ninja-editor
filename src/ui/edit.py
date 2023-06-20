@@ -281,13 +281,9 @@ def push():
         f"Readed contents from the widget and saved it into settings.py: {settings_py_path}"
     )
 
-    local_repo_path = g.AppState.local_repo_path
-    repo = Repo(local_repo_path)
-
+    repo = g.AppState.repo
     index = repo.index
-    index.add([settings_py_path])
-
-    sly.logger.info(f"Added settings.py to index: {settings_py_path}")
+    index.add(["*"])
 
     if not index.diff("HEAD"):
         sly.logger.info("No files was added to index in repo. Nothing to commit.")
